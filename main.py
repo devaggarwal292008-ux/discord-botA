@@ -1,3 +1,6 @@
+from keep_alive import keep_alive
+
+keep_alive()  # start Flask server so Render sees an open port
 import os
 import discord
 from discord.ext import commands
