@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import math
 from datetime import datetime, timedelta
 import json
@@ -12,7 +13,7 @@ class Levels(commands.Cog):
         self.bot = bot
         self.user_xp = {}
         self.last_daily = {}
-        self.user_roles = {}  # ⬅️ track roles given
+        self.user_roles = {}  # track roles given
         self.level_roles = {
             5: "Novice Voidwalker",
             10: "Abyssal Explorer",
@@ -25,7 +26,7 @@ class Levels(commands.Cog):
         }
         self.load_data()
 
-    # 📌 JSON persistence
+    # JSON persistence
     def save_data(self):
         data = {
             "user_xp": self.user_xp,
@@ -46,7 +47,7 @@ class Levels(commands.Cog):
                 }
                 self.user_roles = {int(k): v for k, v in data.get("user_roles", {}).items()}
 
-    # 📌 Leveling system
+    # Leveling system
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
@@ -73,7 +74,6 @@ class Levels(commands.Cog):
                         reason=f"Created for level {new_level}"
                     )
 
-                # ✅ Only add role if not already saved
                 given_roles = self.user_roles.get(user_id, [])
                 if role_name not in given_roles:
                     await message.author.add_roles(role)
@@ -82,16 +82,17 @@ class Levels(commands.Cog):
                     self.save_data()
                     await message.channel.send(f"🏅 {message.author.mention} earned **{role_name}**!")
 
-    # 📌 Rank (prefix + slash)
+    # Prefix rank command
     @commands.command(aliases=["rank"])
     async def level(self, ctx, member: discord.Member = None):
         member = member or ctx.author
         await self.send_level_embed(ctx, member)
 
-    @commands.slash_command(name="level", description="Check your current level, XP, and roles")
-    async def level_slash(self, ctx: discord.ApplicationContext, member: discord.Member = None):
-        member = member or ctx.author
-        await self.send_level_embed(ctx, member, slash=True)
+    # Slash rank command
+    @app_commands.command(name="level", description="Check your current level, XP, and roles")
+    async def level_slash(self, interaction: discord.Interaction, member: discord.Member | None = None):
+        member = member or interaction.user
+        await self.send_level_embed(interaction, member, slash=True)
 
     async def send_level_embed(self, ctx, member, slash=False):
         xp = self.user_xp.get(member.id, 0)
@@ -114,11 +115,11 @@ class Levels(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
 
         if slash:
-            await ctx.respond(embed=embed)
+            await ctx.response.send_message(embed=embed)
         else:
             await ctx.send(embed=embed)
 
-    # 📌 Leaderboard
+    # Leaderboard
     @commands.command()
     async def leaderboard(self, ctx):
         if not self.user_xp:
@@ -130,39 +131,41 @@ class Levels(commands.Cog):
             member = ctx.guild.get_member(user_id)
             if member:
                 lvl = int(math.sqrt(xp) // 2)
-                embed.add_field(name=f"{i}. {member.display_name}", value=f"Level {lvl} | {xp} XP", inline=False)
+                embed.add_field(name=f"{i}. {member.display_name}",
+                                value=f"Level {lvl} | {xp} XP", inline=False)
 
         await ctx.send(embed=embed)
 
-    # 📌 Daily reward
+    # Daily reward
     @commands.command()
     async def daily(self, ctx):
         await self.handle_daily(ctx)
 
-    @commands.slash_command(name="daily", description="Claim your daily XP reward")
-    async def daily_slash(self, ctx: discord.ApplicationContext):
-        await self.handle_daily(ctx, slash=True)
+    @app_commands.command(name="daily", description="Claim your daily XP reward")
+    async def daily_slash(self, interaction: discord.Interaction):
+        await self.handle_daily(interaction, slash=True)
 
     async def handle_daily(self, ctx, slash=False):
-        user_id = ctx.author.id
+        user_id = ctx.author.id if not slash else ctx.user.id
         now = datetime.utcnow()
 
         if user_id in self.last_daily and now < self.last_daily[user_id] + timedelta(hours=24):
             remaining = self.last_daily[user_id] + timedelta(hours=24) - now
             hours, remainder = divmod(int(remaining.total_seconds()), 3600)
             minutes, _ = divmod(remainder, 60)
-            msg = f"⏳ {ctx.author.mention}, you can claim daily again in **{hours}h {minutes}m**."
+            msg = f"⏳ {ctx.author.mention if not slash else ctx.user.mention}, you can claim daily again in **{hours}h {minutes}m**."
         else:
             self.user_xp[user_id] = self.user_xp.get(user_id, 0) + 50
             self.last_daily[user_id] = now
             self.save_data()
-            msg = f"🎁 {ctx.author.mention}, you claimed your daily reward of **50 XP**!"
+            msg = f"🎁 {ctx.author.mention if not slash else ctx.user.mention}, you claimed your daily reward of **50 XP**!"
 
         if slash:
-            await ctx.respond(msg)
+            await ctx.response.send_message(msg)
         else:
             await ctx.send(msg)
 
 async def setup(bot):
     await bot.add_cog(Levels(bot))
+
 
