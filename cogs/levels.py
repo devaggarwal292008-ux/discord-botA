@@ -2,12 +2,17 @@ import discord
 from discord.ext import commands
 import math
 from datetime import datetime, timedelta
+import json
+import os
+
+DATA_FILE = "levels.json"
 
 class Levels(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.user_xp = {}
         self.last_daily = {}
+        self.user_roles = {}  # ⬅️ track roles given
         self.level_roles = {
             5: "Novice Voidwalker",
             10: "Abyssal Explorer",
@@ -18,6 +23,28 @@ class Levels(commands.Cog):
             100: "Abyssal Lord",
             150: "Cosmic Overlord"
         }
+        self.load_data()
+
+    # 📌 JSON persistence
+    def save_data(self):
+        data = {
+            "user_xp": self.user_xp,
+            "last_daily": {str(k): v.isoformat() for k, v in self.last_daily.items()},
+            "user_roles": {str(k): v for k, v in self.user_roles.items()},
+        }
+        with open(DATA_FILE, "w") as f:
+            json.dump(data, f)
+
+    def load_data(self):
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r") as f:
+                data = json.load(f)
+                self.user_xp = {int(k): v for k, v in data.get("user_xp", {}).items()}
+                self.last_daily = {
+                    int(k): datetime.fromisoformat(v)
+                    for k, v in data.get("last_daily", {}).items()
+                }
+                self.user_roles = {int(k): v for k, v in data.get("user_roles", {}).items()}
 
     # 📌 Leveling system
     @commands.Cog.listener()
@@ -27,6 +54,7 @@ class Levels(commands.Cog):
 
         user_id = message.author.id
         self.user_xp[user_id] = self.user_xp.get(user_id, 0) + 10
+        self.save_data()
 
         new_level = int(math.sqrt(self.user_xp[user_id]) // 2)
         current_level = getattr(message.author, "level", 0)
@@ -44,8 +72,15 @@ class Levels(commands.Cog):
                         color=discord.Color.purple(),
                         reason=f"Created for level {new_level}"
                     )
-                await message.author.add_roles(role)
-                await message.channel.send(f"🏅 {message.author.mention} earned **{role_name}**!")
+
+                # ✅ Only add role if not already saved
+                given_roles = self.user_roles.get(user_id, [])
+                if role_name not in given_roles:
+                    await message.author.add_roles(role)
+                    given_roles.append(role_name)
+                    self.user_roles[user_id] = given_roles
+                    self.save_data()
+                    await message.channel.send(f"🏅 {message.author.mention} earned **{role_name}**!")
 
     # 📌 Rank (prefix + slash)
     @commands.command(aliases=["rank"])
@@ -65,7 +100,7 @@ class Levels(commands.Cog):
         progress = min(xp / next_level_xp, 1)
         progress_bar = "█" * int(progress * 20) + "─" * (20 - int(progress * 20))
 
-        earned_roles = [name for req, name in self.level_roles.items() if lvl >= req]
+        earned_roles = self.user_roles.get(member.id, [])
         roles_display = ", ".join(earned_roles) if earned_roles else "None"
 
         embed = discord.Embed(
@@ -120,6 +155,7 @@ class Levels(commands.Cog):
         else:
             self.user_xp[user_id] = self.user_xp.get(user_id, 0) + 50
             self.last_daily[user_id] = now
+            self.save_data()
             msg = f"🎁 {ctx.author.mention}, you claimed your daily reward of **50 XP**!"
 
         if slash:
@@ -129,3 +165,4 @@ class Levels(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Levels(bot))
+
