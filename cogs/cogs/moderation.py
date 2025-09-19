@@ -7,16 +7,16 @@ import os
 DATA_FILE = "warnings.json"
 
 class Moderation(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.warnings = {}
+        self.warnings: dict[int, int] = {}
         self.banned_words = [
             "fuck", "shit", "bitch", "asshole",
             "randi", "madarchod", "bhenchod", "lund"
         ]
         self.load_data()
 
-    # 📌 JSON persistence
+    # === JSON persistence ===
     def save_data(self):
         with open(DATA_FILE, "w") as f:
             json.dump(self.warnings, f)
@@ -27,9 +27,9 @@ class Moderation(commands.Cog):
                 data = json.load(f)
                 self.warnings = {int(k): v for k, v in data.items()}
 
-    # 📌 Auto warnings for banned words
+    # === Auto warnings for banned words ===
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
 
@@ -40,22 +40,25 @@ class Moderation(commands.Cog):
             count = self.warnings[user_id]
             self.save_data()
 
-            await message.channel.send(f"⚠️ {message.author.mention}, you have been warned! ({count}/4)")
+            await message.channel.send(
+                f"⚠️ {message.author.mention}, you have been warned! ({count}/4)"
+            )
 
             if count >= 4:
                 try:
-                    await message.author.ban(reason="Exceeded warning limit for abusive words.")
-                    await message.channel.send(f"⛔ {message.author.mention} has been banned for repeated abuse.")
+                    await message.author.ban(
+                        reason="Exceeded warning limit for abusive words."
+                    )
+                    await message.channel.send(
+                        f"⛔ {message.author.mention} has been banned for repeated abuse."
+                    )
                 except discord.Forbidden:
                     await message.channel.send("❌ I don’t have permission to ban this user.")
 
-        # Allow prefix commands to still work
-        await self.bot.process_commands(message)
-
-    # 📌 Manual warn (prefix)
+    # === Manual warn (prefix) ===
     @commands.command()
     @commands.has_permissions(kick_members=True)
-    async def warn(self, ctx, member: discord.Member, *, reason="No reason provided"):
+    async def warn(self, ctx: commands.Context, member: discord.Member, *, reason="No reason provided"):
         user_id = member.id
         self.warnings[user_id] = self.warnings.get(user_id, 0) + 1
         count = self.warnings[user_id]
@@ -70,42 +73,24 @@ class Moderation(commands.Cog):
             except discord.Forbidden:
                 await ctx.send("❌ I don’t have permission to ban this user.")
 
-    # 📌 Manual warn (slash)
-    @app_commands.command(name="warn", description="Warn a user (4 warnings = ban)")
-    @app_commands.checks.has_permissions(kick_members=True)
-    async def warn_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
-        user_id = member.id
-        self.warnings[user_id] = self.warnings.get(user_id, 0) + 1
-        count = self.warnings[user_id]
-        self.save_data()
-
-        await interaction.response.send_message(f"⚠️ {member.mention} has been warned! Reason: {reason} ({count}/4)")
-
-        if count >= 4:
-            try:
-                await member.ban(reason="Exceeded warning limit")
-                await interaction.followup.send(f"⛔ {member.mention} has been banned after 4 warnings.")
-            except discord.Forbidden:
-                await interaction.followup.send("❌ I don’t have permission to ban this user.")
-
-    # 📌 Check warnings (prefix)
+    # === Check warnings (prefix) ===
     @commands.command()
-    async def warnings(self, ctx, member: discord.Member = None):
+    async def warnings(self, ctx: commands.Context, member: discord.Member = None):
         member = member or ctx.author
         count = self.warnings.get(member.id, 0)
         await ctx.send(f"📊 {member.mention} has **{count} warnings**.")
 
-    # 📌 Check warnings (slash)
+    # === Check warnings (slash) ===
     @app_commands.command(name="warnings", description="Check how many warnings a user has")
-    async def warnings_slash(self, interaction: discord.Interaction, member: discord.Member | None = None):
+    async def warnings_slash(self, interaction: discord.Interaction, member: discord.Member = None):
         member = member or interaction.user
         count = self.warnings.get(member.id, 0)
         await interaction.response.send_message(f"📊 {member.mention} has **{count} warnings**.")
 
-    # 📌 Clear warnings (prefix)
+    # === Clear warnings (prefix) ===
     @commands.command()
     @commands.has_permissions(kick_members=True)
-    async def clearwarnings(self, ctx, member: discord.Member):
+    async def clearwarnings(self, ctx: commands.Context, member: discord.Member):
         if member.id in self.warnings:
             self.warnings.pop(member.id)
             self.save_data()
@@ -113,9 +98,9 @@ class Moderation(commands.Cog):
         else:
             await ctx.send(f"ℹ️ {member.mention} has no warnings.")
 
-    # 📌 Clear warnings (slash)
+    # === Clear warnings (slash) ===
     @app_commands.command(name="clearwarnings", description="Clear all warnings for a user")
-    @app_commands.checks.has_permissions(kick_members=True)
+    @commands.has_permissions(kick_members=True)
     async def clearwarnings_slash(self, interaction: discord.Interaction, member: discord.Member):
         if member.id in self.warnings:
             self.warnings.pop(member.id)
@@ -124,7 +109,8 @@ class Moderation(commands.Cog):
         else:
             await interaction.response.send_message(f"ℹ️ {member.mention} has no warnings.")
 
-async def setup(bot):
+async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
+
 
 
