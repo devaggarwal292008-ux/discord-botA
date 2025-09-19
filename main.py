@@ -4,7 +4,6 @@ import asyncio
 from flask import Flask
 import discord
 from discord.ext import commands
-from discord import app_commands
 
 # ===== Flask keep-alive =====
 app = Flask(__name__)
@@ -25,8 +24,8 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# --- Command tree for slash commands ---
-tree = app_commands.CommandTree(bot)
+# --- Use bot.tree instead of creating a new one ---
+tree = bot.tree   # ✅ FIXED
 
 @bot.event
 async def on_ready():
@@ -51,5 +50,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
