@@ -55,6 +55,9 @@ class Moderation(commands.Cog):
                 except discord.Forbidden:
                     await message.channel.send("❌ I don’t have permission to ban this user.")
 
+        # ✅ Make sure prefix commands still run
+        await self.bot.process_commands(message)
+
     # === Manual warn (prefix) ===
     @commands.command()
     @commands.has_permissions(kick_members=True)
@@ -109,8 +112,14 @@ class Moderation(commands.Cog):
         else:
             await interaction.response.send_message(f"ℹ️ {member.mention} has no warnings.")
 
+# === Cog Setup ===
 async def setup(bot: commands.Bot):
-    await bot.add_cog(Moderation(bot))
+    cog = Moderation(bot)
+    await bot.add_cog(cog)
+    # ✅ Explicitly register slash commands like in Levels
+    bot.tree.add_command(cog.warnings_slash)
+    bot.tree.add_command(cog.clearwarnings_slash)
+
 
 
 
