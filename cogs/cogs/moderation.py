@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import json
 import os
 
@@ -48,7 +49,10 @@ class Moderation(commands.Cog):
                 except discord.Forbidden:
                     await message.channel.send("❌ I don’t have permission to ban this user.")
 
-    # 📌 Manual warn (mods only)
+        # Allow prefix commands to still work
+        await self.bot.process_commands(message)
+
+    # 📌 Manual warn (prefix)
     @commands.command()
     @commands.has_permissions(kick_members=True)
     async def warn(self, ctx, member: discord.Member, *, reason="No reason provided"):
@@ -66,6 +70,24 @@ class Moderation(commands.Cog):
             except discord.Forbidden:
                 await ctx.send("❌ I don’t have permission to ban this user.")
 
+    # 📌 Manual warn (slash)
+    @app_commands.command(name="warn", description="Warn a user (4 warnings = ban)")
+    @app_commands.checks.has_permissions(kick_members=True)
+    async def warn_slash(self, interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+        user_id = member.id
+        self.warnings[user_id] = self.warnings.get(user_id, 0) + 1
+        count = self.warnings[user_id]
+        self.save_data()
+
+        await interaction.response.send_message(f"⚠️ {member.mention} has been warned! Reason: {reason} ({count}/4)")
+
+        if count >= 4:
+            try:
+                await member.ban(reason="Exceeded warning limit")
+                await interaction.followup.send(f"⛔ {member.mention} has been banned after 4 warnings.")
+            except discord.Forbidden:
+                await interaction.followup.send("❌ I don’t have permission to ban this user.")
+
     # 📌 Check warnings (prefix)
     @commands.command()
     async def warnings(self, ctx, member: discord.Member = None):
@@ -74,13 +96,13 @@ class Moderation(commands.Cog):
         await ctx.send(f"📊 {member.mention} has **{count} warnings**.")
 
     # 📌 Check warnings (slash)
-    @commands.slash_command(name="warnings", description="Check how many warnings a user has")
-    async def warnings_slash(self, ctx: discord.ApplicationContext, member: discord.Member = None):
-        member = member or ctx.author
+    @app_commands.command(name="warnings", description="Check how many warnings a user has")
+    async def warnings_slash(self, interaction: discord.Interaction, member: discord.Member | None = None):
+        member = member or interaction.user
         count = self.warnings.get(member.id, 0)
-        await ctx.respond(f"📊 {member.mention} has **{count} warnings**.")
+        await interaction.response.send_message(f"📊 {member.mention} has **{count} warnings**.")
 
-    # 📌 Clear warnings (mods only, prefix)
+    # 📌 Clear warnings (prefix)
     @commands.command()
     @commands.has_permissions(kick_members=True)
     async def clearwarnings(self, ctx, member: discord.Member):
@@ -91,17 +113,18 @@ class Moderation(commands.Cog):
         else:
             await ctx.send(f"ℹ️ {member.mention} has no warnings.")
 
-    # 📌 Clear warnings (mods only, slash)
-    @commands.slash_command(name="clearwarnings", description="Clear all warnings for a user")
-    @commands.has_permissions(kick_members=True)
-    async def clearwarnings_slash(self, ctx: discord.ApplicationContext, member: discord.Member):
+    # 📌 Clear warnings (slash)
+    @app_commands.command(name="clearwarnings", description="Clear all warnings for a user")
+    @app_commands.checks.has_permissions(kick_members=True)
+    async def clearwarnings_slash(self, interaction: discord.Interaction, member: discord.Member):
         if member.id in self.warnings:
             self.warnings.pop(member.id)
             self.save_data()
-            await ctx.respond(f"✅ Cleared all warnings for {member.mention}.")
+            await interaction.response.send_message(f"✅ Cleared all warnings for {member.mention}.")
         else:
-            await ctx.respond(f"ℹ️ {member.mention} has no warnings.")
+            await interaction.response.send_message(f"ℹ️ {member.mention} has no warnings.")
 
 async def setup(bot):
     await bot.add_cog(Moderation(bot))
+
 
