@@ -114,8 +114,5 @@ class Moderation(commands.Cog):
 
 # === Cog Setup ===
 async def setup(bot: commands.Bot):
-    cog = Moderation(bot)
-    await bot.add_cog(cog)
-    # ✅ Explicitly register slash commands like in Levels
-    bot.tree.add_command(cog.warnings_slash)
-    bot.tree.add_command(cog.clearwarnings_slash)
+    await bot.add_cog(Moderation(bot))  # ✅ no duplicate add_command
+
