@@ -13,7 +13,7 @@ class Levels(commands.Cog):
         self.bot = bot
         self.user_xp = {}
         self.last_daily = {}
-        self.user_roles = {}  # track roles given
+        self.user_roles = {}
         self.level_roles = {
             5: "Novice Voidwalker",
             10: "Abyssal Explorer",
@@ -82,6 +82,8 @@ class Levels(commands.Cog):
                     self.save_data()
                     await message.channel.send(f"🏅 {message.author.mention} earned **{role_name}**!")
 
+        await self.bot.process_commands(message)
+
     # Prefix rank command
     @commands.command(aliases=["rank"])
     async def level(self, ctx, member: discord.Member = None):
@@ -89,7 +91,7 @@ class Levels(commands.Cog):
         await self.send_level_embed(ctx, member)
 
     # Slash rank command
-    @app_commands.command(name="level", description="Check your current level, XP, and roles")
+    @app_commands.command(name="level", description="Check your current level, XP, rank, and roles")
     async def level_slash(self, interaction: discord.Interaction, member: discord.Member | None = None):
         member = member or interaction.user
         await self.send_level_embed(interaction, member, slash=True)
@@ -104,12 +106,17 @@ class Levels(commands.Cog):
         earned_roles = self.user_roles.get(member.id, [])
         roles_display = ", ".join(earned_roles) if earned_roles else "None"
 
+        # --- NEW: Rank calculation ---
+        sorted_users = sorted(self.user_xp.items(), key=lambda x: x[1], reverse=True)
+        rank = next((i for i, (uid, _) in enumerate(sorted_users, start=1) if uid == member.id), None)
+
         embed = discord.Embed(
             title=f"{member.display_name}'s Level Progress",
             color=discord.Color.green()
         )
         embed.add_field(name="Level", value=lvl, inline=True)
         embed.add_field(name="XP", value=f"{xp}/{next_level_xp}", inline=True)
+        embed.add_field(name="Rank", value=f"#{rank}" if rank else "Unranked", inline=True)
         embed.add_field(name="Progress", value=f"[{progress_bar}]", inline=False)
         embed.add_field(name="Roles Earned", value=roles_display, inline=False)
         embed.set_thumbnail(url=member.display_avatar.url)
@@ -135,6 +142,22 @@ class Levels(commands.Cog):
                                 value=f"Level {lvl} | {xp} XP", inline=False)
 
         await ctx.send(embed=embed)
+
+    @app_commands.command(name="leaderboard", description="View the top players")
+    async def leaderboard_slash(self, interaction: discord.Interaction):
+        if not self.user_xp:
+            return await interaction.response.send_message("⚠️ No XP data yet!")
+
+        sorted_users = sorted(self.user_xp.items(), key=lambda x: x[1], reverse=True)[:10]
+        embed = discord.Embed(title="🏆 Leaderboard - Top Voidwalkers", color=discord.Color.gold())
+        for i, (user_id, xp) in enumerate(sorted_users, start=1):
+            member = interaction.guild.get_member(user_id)
+            if member:
+                lvl = int(math.sqrt(xp) // 2)
+                embed.add_field(name=f"{i}. {member.display_name}",
+                                value=f"Level {lvl} | {xp} XP", inline=False)
+
+        await interaction.response.send_message(embed=embed)
 
     # Daily reward
     @commands.command()
@@ -164,6 +187,15 @@ class Levels(commands.Cog):
             await ctx.response.send_message(msg)
         else:
             await ctx.send(msg)
+
+async def setup(bot):
+    cog = Levels(bot)
+    await bot.add_cog(cog)
+    # ✅ Register slash commands explicitly
+    bot.tree.add_command(cog.level_slash)
+    bot.tree.add_command(cog.leaderboard_slash)
+    bot.tree.add_command(cog.daily_slash)
+
 
 async def setup(bot):
     await bot.add_cog(Levels(bot))
