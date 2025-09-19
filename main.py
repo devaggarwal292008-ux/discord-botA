@@ -1,10 +1,27 @@
-from keep_alive import keep_alive
-
-keep_alive()  # start Flask server so Render sees an open port
 import os
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from flask import Flask
+from threading import Thread
+
+# ------------------- KEEP ALIVE SERVER -------------------
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Bot is alive!"
+
+def run():
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+# ---------------------------------------------------------
+
+# Start keep-alive server so Render + UptimeRobot keep it alive
+keep_alive()
 
 # Load environment variables
 load_dotenv()
@@ -30,7 +47,10 @@ async def on_ready():
     # Load cogs
     for filename in os.listdir("./cogs"):
         if filename.endswith(".py"):
-            await bot.load_extension(f"cogs.{filename[:-3]}")
-            print(f"🔹 Loaded cog {filename}")
+            try:
+                await bot.load_extension(f"cogs.{filename[:-3]}")
+                print(f"🔹 Loaded cog {filename}")
+            except Exception as cog_error:
+                print(f"⚠️ Failed to load {filename}: {cog_error}")
 
 bot.run(TOKEN)
