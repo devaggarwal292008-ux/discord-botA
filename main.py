@@ -1,8 +1,10 @@
-import discord
-from discord.ext import commands
 import os
 import threading
+import asyncio
 from flask import Flask
+import discord
+from discord.ext import commands
+from discord import app_commands
 
 # ===== Flask keep-alive =====
 app = Flask(__name__)
@@ -14,7 +16,7 @@ def home():
 def run_flask():
     app.run(host="0.0.0.0", port=8080)
 
-threading.Thread(target=run_flask).start()
+threading.Thread(target=run_flask, daemon=True).start()
 
 # ===== Discord Bot Setup =====
 intents = discord.Intents.default()
@@ -23,12 +25,18 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# --- Command tree for slash commands ---
+tree = app_commands.CommandTree(bot)
+
 @bot.event
 async def on_ready():
+    # Sync slash commands each time the bot starts
+    await tree.sync()
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     print("------")
 
 async def load_cogs():
+    """Load all cog extensions."""
     for ext in ["cogs.utility", "cogs.levels", "cogs.moderation", "cogs.welcome"]:
         try:
             await bot.load_extension(ext)
@@ -41,6 +49,7 @@ async def main():
         await load_cogs()
         await bot.start(os.getenv("DISCORD_TOKEN"))
 
-import asyncio
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
+
 
