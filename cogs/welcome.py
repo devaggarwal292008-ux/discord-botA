@@ -18,10 +18,10 @@ class Welcome(commands.Cog):
             }
             channel = await member.guild.create_text_channel("🚪｜welcome", overwrites=overwrites)
 
-        # Load the banner you uploaded
-        banner_path = "1000383155.jpg"
+        # Load the banner (make sure banner.jpeg is in the repo root)
+        banner_path = os.path.join(os.path.dirname(__file__), "..", "banner.jpeg")
         if not os.path.exists(banner_path):
-            await channel.send("⚠️ Banner image not found! Please upload `1000383155.jpg` in the bot folder.")
+            await channel.send("⚠️ Banner image not found! Please upload `banner.jpeg` in the bot folder.")
             return
 
         background = Image.open(banner_path).convert("RGBA")
@@ -41,7 +41,7 @@ class Welcome(commands.Cog):
         # Text drawing
         draw = ImageDraw.Draw(background)
         try:
-            font_big = ImageFont.truetype("arial.ttf", 60)  # Uses Arial if present
+            font_big = ImageFont.truetype("arial.ttf", 60)  # Uses Arial if available
             font_small = ImageFont.truetype("arial.ttf", 40)
         except:
             font_big = ImageFont.load_default()
@@ -64,6 +64,7 @@ class Welcome(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Welcome(bot))
+
 
 
 
