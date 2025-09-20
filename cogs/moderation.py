@@ -31,6 +31,12 @@ class Moderation(commands.Cog):
                 data = json.load(f)
                 self.warnings = {int(k): v for k, v in data.items()}
 
+    # === Logging helper ===
+    async def log_action(self, guild: discord.Guild, message: str):
+        log_channel = discord.utils.get(guild.text_channels, name="📁｜mod-logs")
+        if log_channel:
+            await log_channel.send(message)
+
     # === Helper: check moderator role ===
     async def is_moderator(self, interaction: discord.Interaction) -> bool:
         role = discord.utils.get(interaction.user.roles, name="🛡️ Void Sentinels")
@@ -44,11 +50,13 @@ class Moderation(commands.Cog):
         self.save_data()
 
         await send_func(f"⚠️ {member.mention} has been warned! Reason: {reason} ({count}/4)")
+        await self.log_action(member.guild, f"⚠️ {member} warned. Reason: {reason} ({count}/4)")
 
         if count >= 4:
             try:
                 await member.ban(reason="Exceeded warning limit")
                 await send_func(f"⛔ {member.mention} has been banned after 4 warnings.")
+                await self.log_action(member.guild, f"⛔ {member} banned after 4 warnings.")
                 # reset warnings after ban
                 self.warnings.pop(user_id, None)
                 self.save_data()
@@ -64,6 +72,7 @@ class Moderation(commands.Cog):
             self.warnings.pop(member.id)
             self.save_data()
             await send_func(f"✅ Cleared all warnings for {member.mention}.")
+            await self.log_action(member.guild, f"✅ Cleared warnings for {member}")
         else:
             await send_func(f"ℹ️ {member.mention} has no warnings.")
 
@@ -128,6 +137,7 @@ class Moderation(commands.Cog):
             until = discord.utils.utcnow() + datetime.timedelta(seconds=seconds)
             await member.timeout(until, reason=reason)
             await interaction.followup.send(f"🔇 {member.mention} has been muted for {duration}. Reason: {reason}")
+            await self.log_action(interaction.guild, f"🔇 {member} muted for {duration}. Reason: {reason}")
         except discord.Forbidden:
             await interaction.followup.send("❌ I don’t have permission to mute this user.")
 
@@ -141,6 +151,7 @@ class Moderation(commands.Cog):
         try:
             await member.timeout(None)
             await interaction.followup.send(f"🔊 {member.mention} has been unmuted.")
+            await self.log_action(interaction.guild, f"🔊 {member} unmuted.")
         except discord.Forbidden:
             await interaction.followup.send("❌ I don’t have permission to unmute this user.")
 
@@ -163,6 +174,7 @@ class Moderation(commands.Cog):
 # === Cog Setup ===
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
+
 
 
 
