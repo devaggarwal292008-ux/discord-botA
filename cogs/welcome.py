@@ -1,17 +1,16 @@
 import discord
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont
-import aiohttp
 import io
-
-BANNER_URL = "https://cdn.discordapp.com/attachments/1358566775708586067/1419004867766124695/IMG_20250920_141448.jpg?ex=68d02ec4&is=68cedd44&hm=dd0e724ff1154099a5a7691fd682dde3be005242c37f76737812f25e9c3b27e6"
+import os
 
 class Welcome(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
     @commands.Cog.listener()
-    async def on_member_join(self, member: discord.Member):
+    async def on_member_join(self, member):
+        # Find or create welcome channel
         channel = discord.utils.get(member.guild.text_channels, name="🚪｜welcome")
         if not channel:
             overwrites = {
@@ -19,48 +18,53 @@ class Welcome(commands.Cog):
             }
             channel = await member.guild.create_text_channel("🚪｜welcome", overwrites=overwrites)
 
-        # Fetch banner
-        async with aiohttp.ClientSession() as session:
-            async with session.get(BANNER_URL) as resp:
-                banner_bytes = await resp.read()
-        banner = Image.open(io.BytesIO(banner_bytes)).convert("RGBA")
+        # Load the banner you uploaded
+        banner_path = "1000383155.jpg"
+        if not os.path.exists(banner_path):
+            await channel.send("⚠️ Banner image not found! Please upload `1000383155.jpg` in the bot folder.")
+            return
 
-        # Fetch member avatar
-        async with aiohttp.ClientSession() as session:
-            async with session.get(str(member.display_avatar.url)) as resp:
-                avatar_bytes = await resp.read()
+        background = Image.open(banner_path).convert("RGBA")
+
+        # Get member avatar
+        avatar_asset = member.display_avatar.replace(size=128)
+        avatar_bytes = await avatar_asset.read()
         avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
-        avatar = avatar.resize((200, 200))
+        avatar = avatar.resize((150, 150))
 
-        # Make circular avatar
+        # Circle mask for avatar
         mask = Image.new("L", avatar.size, 0)
-        draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0, avatar.size[0], avatar.size[1]), fill=255)
-        avatar.putalpha(mask)
+        draw_mask = ImageDraw.Draw(mask)
+        draw_mask.ellipse((0, 0, avatar.size[0], avatar.size[1]), fill=255)
+        background.paste(avatar, (50, 100), mask)
 
-        # Paste avatar on banner
-        banner.paste(avatar, (50, 50), avatar)
-
-        # Draw text
-        draw = ImageDraw.Draw(banner)
+        # Text drawing
+        draw = ImageDraw.Draw(background)
         try:
-            font = ImageFont.truetype("arial.ttf", 50)
+            font_big = ImageFont.truetype("arial.ttf", 60)  # Uses Arial if present
+            font_small = ImageFont.truetype("arial.ttf", 40)
         except:
-            font = ImageFont.load_default()
+            font_big = ImageFont.load_default()
+            font_small = ImageFont.load_default()
 
-        username = f"Welcome {member.name}!"
-        member_count = f"You are our {len(member.guild.members)}th member 🎉"
-        draw.text((300, 80), username, font=font, fill="white")
-        draw.text((300, 150), member_count, font=font, fill="white")
+        text = f"Welcome {member.name}!"
+        subtext = f"You are member #{len(member.guild.members)}"
 
-        # Save to BytesIO
-        with io.BytesIO() as image_binary:
-            banner.save(image_binary, "PNG")
-            image_binary.seek(0)
-            await channel.send(file=discord.File(fp=image_binary, filename="welcome.png"))
+        draw.text((250, 120), text, font=font_big, fill="white")
+        draw.text((250, 200), subtext, font=font_small, fill="white")
+
+        # Save image to buffer
+        buffer = io.BytesIO()
+        background.save(buffer, "PNG")
+        buffer.seek(0)
+
+        # Send banner
+        file = discord.File(fp=buffer, filename="welcome.png")
+        await channel.send(content=f"🎉 Welcome to **{member.guild.name}** {member.mention}!", file=file)
 
 async def setup(bot):
     await bot.add_cog(Welcome(bot))
+
 
 
 
