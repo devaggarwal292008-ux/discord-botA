@@ -30,8 +30,8 @@ class Welcome(commands.Cog):
             channel = member.guild.system_channel
 
         try:
-            # Banner path (place banner.jpeg in repo root)
-            banner_path = os.path.join(os.path.dirname(__file__), "..", "banner.jpeg")
+            # Banner path (place BANNER2.jpeg in repo root)
+            banner_path = os.path.join(os.path.dirname(__file__), "..", "BANNER2.jpeg")
             if not os.path.exists(banner_path):
                 if channel:
                     await channel.send(f"🎉 Welcome to **{member.guild.name}** {member.mention}!")
@@ -102,6 +102,7 @@ class Welcome(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Welcome(bot))
+
 
 
 
