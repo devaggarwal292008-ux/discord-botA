@@ -102,7 +102,6 @@ class Welcome(commands.Cog):
 
             draw = ImageDraw.Draw(background)
 
-            # Simplified text
             main_text = f"HEY @{member.display_name.upper()}!"
             subtext = f"WELCOME TO {guild.name.upper()} | YOU ARE OUR {len(guild.members)}TH MEMBER!"
 
@@ -112,7 +111,6 @@ class Welcome(commands.Cog):
             text_y = avatar_center_y - main_h // 2 - int(H * 0.04)
             subtext_y = text_y + main_h + int(H * 0.03)
 
-            # Gradient colors: cyan → white
             self._draw_gradient_text(
                 background, (text_x, text_y), main_text, font_big,
                 left_color=(0, 220, 220), right_color=(255, 255, 255), shadow=3
@@ -126,7 +124,9 @@ class Welcome(commands.Cog):
             background.save(buf, "PNG")
             buf.seek(0)
             file = discord.File(fp=buf, filename="welcome.png")
-            await channel.send(content=f"🎉 Welcome to **{guild.name}** {member.mention}!", file=file)
+
+            # ✅ Only one message (banner + text in one)
+            await channel.send(content=f"🎉 Welcome {member.mention} to **{guild.name}**!", file=file)
 
         except Exception as exc:
             traceback.print_exc()
@@ -134,6 +134,7 @@ class Welcome(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Welcome(bot))
+
 
 
 
