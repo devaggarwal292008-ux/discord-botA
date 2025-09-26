@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont
 import io
 import os
 import traceback
@@ -9,105 +9,111 @@ class Welcome(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def _get_welcome_channel(self, guild: discord.Guild) -> discord.TextChannel | None:
-        """Find welcome channel by exact name or fallback to first match."""
-        ch = discord.utils.get(guild.text_channels, name="🚪｜welcome")
-        if ch:
-            return ch
-        for c in guild.text_channels:
-            if "welcome" in c.name.lower():
-                return c
-        return guild.system_channel
+    def _draw_gradient_text(self, base_img, position, text, font, gradient_colors):
+        """Draw text with a left-to-right gradient (white -> cyan)."""
+        # Make mask for the text
+        mask = Image.new("L", base_img.size, 0)
+        draw_mask = ImageDraw.Draw(mask)
+        draw_mask.text(position, text, font=font, fill=255)
+
+        # Create gradient image
+        gradient = Image.new("RGBA", base_img.size, (0, 0, 0, 0))
+        draw_grad = ImageDraw.Draw(gradient)
+
+        x, y = position
+        text_width, text_height = font.getsize(text)
+        for i in range(text_width):
+            ratio = i / text_width
+            r = int(gradient_colors[0][0] * (1 - ratio) + gradient_colors[1][0] * ratio)
+            g = int(gradient_colors[0][1] * (1 - ratio) + gradient_colors[1][1] * ratio)
+            b = int(gradient_colors[0][2] * (1 - ratio) + gradient_colors[1][2] * ratio)
+            draw_grad.line([(x + i, y), (x + i, y + text_height)], fill=(r, g, b), width=1)
+
+        # Paste gradient only where text mask is
+        base_img.paste(gradient, (0, 0), mask)
 
     @commands.Cog.listener()
-    async def on_member_join(self, member: discord.Member):
-        guild = member.guild
-        channel = await self._get_welcome_channel(guild)
+    async def on_member_join(self, member):
+        channel = discord.utils.get(member.guild.text_channels, name="🚪｜welcome")
         if not channel:
-            print(f"[WELCOME] ⚠️ No welcome channel found in {guild.name}")
-            return
+            channel = member.guild.system_channel
 
         try:
-            # Paths
-            base_dir = os.path.dirname(os.path.dirname(__file__))
-            banner_path = os.path.join(base_dir, "BANNER2.jpg")
-            font_path = os.path.join(base_dir, "Asgrike.otf")  # 🔥 Load Asgrike.otf
-
+            # Banner path
+            banner_path = os.path.join(os.path.dirname(__file__), "..", "BANNER2.jpg")
             if not os.path.exists(banner_path):
-                print(f"[WELCOME] ❌ Banner not found at {banner_path}")
-                await channel.send(f"👋 Welcome {member.mention}! (Banner missing)")
+                if channel:
+                    await channel.send(f"🎉 Welcome to **{member.guild.name}** {member.mention}!")
                 return
 
             background = Image.open(banner_path).convert("RGBA")
             W, H = background.size
-            print(f"[WELCOME] ✅ Loaded banner ({W}x{H})")
 
             # Avatar
             avatar_asset = member.display_avatar.replace(size=256)
             avatar_bytes = await avatar_asset.read()
             avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
-
-            avatar_size = int(H * 0.6)  # 60% of banner height
-            avatar = ImageOps.fit(avatar, (avatar_size, avatar_size), Image.LANCZOS)
+            avatar = avatar.resize((220, 220))
 
             mask = Image.new("L", avatar.size, 0)
-            ImageDraw.Draw(mask).ellipse((0, 0, avatar_size, avatar_size), fill=255)
+            mask_draw = ImageDraw.Draw(mask)
+            mask_draw.ellipse((0, 0, avatar.size[0], avatar.size[1]), fill=255)
 
-            # White border
-            border = 6
-            bordered = Image.new("RGBA", (avatar_size + 2*border, avatar_size + 2*border), (0, 0, 0, 0))
-            ring = ImageDraw.Draw(bordered)
-            ring.ellipse((0, 0, bordered.size[0]-1, bordered.size[1]-1), fill=(255, 255, 255, 255))
-            bordered.paste(avatar, (border, border), mask)
-
-            avatar_x = int(W * 0.04)
-            avatar_y = (H - bordered.size[1]) // 2
-            background.paste(bordered, (avatar_x, avatar_y), bordered)
+            avatar_x = 40
+            avatar_y = (H - avatar.size[1]) // 2
+            background.paste(avatar, (avatar_x, avatar_y), mask)
 
             # Fonts
+            font_path = os.path.join(os.path.dirname(__file__), "..", "Asgrike.otf")
             try:
-                font_big = ImageFont.truetype(font_path, int(H * 0.15))   # 15% height
-                font_small = ImageFont.truetype(font_path, int(H * 0.08)) # 8% height
-                print("[WELCOME] ✅ Loaded custom font: Asgrike.otf")
-            except Exception as e:
-                print(f"[WELCOME] ❌ Font error: {e} (falling back)")
+                font_big = ImageFont.truetype(font_path, 70)
+                font_small = ImageFont.truetype(font_path, 40)
+            except Exception:
                 font_big = ImageFont.load_default()
                 font_small = ImageFont.load_default()
 
             draw = ImageDraw.Draw(background)
 
-            text = f"HEY @{member.display_name.upper()} WELCOME TO {guild.name.upper()}"
-            subtext = f"YOU ARE OUR {len(guild.members)}TH MEMBER!"
+            text = f"HEY @{member.name.upper()} WELCOME TO {member.guild.name.upper()}"
+            subtext = f"YOU ARE OUR {len(member.guild.members)}TH MEMBER!"
 
             # Text positions
-            text_x = avatar_x + bordered.size[0] + int(W * 0.05)
-            text_y = avatar_y + int(H * 0.2)
-            subtext_y = text_y + font_big.size + int(H * 0.05)
+            text_x = avatar_x + avatar.size[0] + 40
+            text_y = avatar_y + 10
+            subtext_x = text_x
+            subtext_y = text_y + 80
 
-            # Shadowed text
-            shadow = 2
-            draw.text((text_x+shadow, text_y+shadow), text, font=font_big, fill="black")
-            draw.text((text_x, text_y), text, font=font_big, fill="white")
+            # Gradient text (big)
+            self._draw_gradient_text(
+                background,
+                (text_x, text_y),
+                text,
+                font_big,
+                ((255, 255, 255), (0, 255, 255))  # white → cyan
+            )
 
-            draw.text((text_x+shadow, subtext_y+shadow), subtext, font=font_small, fill="black")
-            draw.text((text_x, subtext_y), subtext, font=font_small, fill="white")
+            # Subtext (solid white)
+            draw.text((subtext_x, subtext_y), subtext, font=font_small, fill="white")
 
-            # Save + send
+            # Save & send
             buffer = io.BytesIO()
             background.save(buffer, "PNG")
             buffer.seek(0)
 
             file = discord.File(fp=buffer, filename="welcome.png")
-            await channel.send(content=f"🎉 Welcome to **{guild.name}** {member.mention}!", file=file)
-
-            print(f"[WELCOME] ✅ Sent banner for {member.display_name} in {guild.name}")
+            if channel:
+                await channel.send(content=f"🎉 Welcome to **{member.guild.name}** {member.mention}!", file=file)
 
         except Exception as exc:
             traceback.print_exc()
-            await channel.send(f"👋 Welcome {member.mention}!\n⚠️ Banner failed: {exc}")
+            if channel:
+                await channel.send(
+                    f"🎉 Welcome to **{member.guild.name}** {member.mention}!\n⚠️ (welcome image failed: {exc})"
+                )
 
 async def setup(bot):
     await bot.add_cog(Welcome(bot))
+
 
 
 
