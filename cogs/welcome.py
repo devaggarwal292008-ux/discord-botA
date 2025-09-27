@@ -94,8 +94,9 @@ class Welcome(commands.Cog):
             background.paste(bordered, (avatar_x, avatar_y), bordered)
 
             try:
-                font_big = ImageFont.truetype(font_path, int(H * 0.14))
-                font_small = ImageFont.truetype(font_path, int(H * 0.07))
+                # 🔹 Slightly increased font sizes
+                font_big = ImageFont.truetype(font_path, int(H * 0.16))
+                font_small = ImageFont.truetype(font_path, int(H * 0.085))
             except Exception:
                 font_big = ImageFont.load_default()
                 font_small = ImageFont.load_default()
@@ -108,8 +109,10 @@ class Welcome(commands.Cog):
             text_x = avatar_x + bordered.size[0] + int(W * 0.05)
             main_w, main_h = self._measure_text(draw, main_text, font_big)
             avatar_center_y = avatar_y + bordered.size[1] // 2
-            text_y = avatar_center_y - main_h // 2 - int(H * 0.04)
-            subtext_y = text_y + main_h + int(H * 0.03)
+
+            # 🔹 Increased vertical spacing slightly
+            text_y = avatar_center_y - main_h // 2 - int(H * 0.06)
+            subtext_y = text_y + main_h + int(H * 0.05)
 
             self._draw_gradient_text(
                 background, (text_x, text_y), main_text, font_big,
@@ -125,7 +128,6 @@ class Welcome(commands.Cog):
             buf.seek(0)
             file = discord.File(fp=buf, filename="welcome.png")
 
-            # ✅ Only one message (banner + text in one)
             await channel.send(content=f"🎉 Welcome {member.mention} to **{guild.name}**!", file=file)
 
         except Exception as exc:
@@ -134,6 +136,7 @@ class Welcome(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Welcome(bot))
+
 
 
 
