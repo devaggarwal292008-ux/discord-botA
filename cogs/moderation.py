@@ -4,6 +4,7 @@ from discord import app_commands
 import json
 import os
 import datetime
+import re
 
 DATA_FILE = "warnings.json"
 
@@ -18,6 +19,8 @@ class Moderation(commands.Cog):
             "randi", "madarchod", "bhenchod", "lund", "chutiya", "gaand", "harami", "nalayak",
             "kamina", "kutta", "kutti", "gandu", "tatti"
         ]
+        # compile regex for performance, word boundaries + case insensitive
+        self.banned_regex = re.compile(r"\b(" + "|".join(map(re.escape, self.banned_words)) + r")\b", re.IGNORECASE)
         self.load_data()
 
     # === JSON persistence ===
@@ -39,7 +42,7 @@ class Moderation(commands.Cog):
 
     # === Helper: check moderator role ===
     async def is_moderator(self, interaction: discord.Interaction) -> bool:
-        role = discord.utils.get(interaction.user.roles, name="🛡️ Void Sentinels")
+        role = discord.utils.get(interaction.user.roles, name="｜Void Sentinels")
         return role is not None
 
     # === Helper methods (shared) ===
@@ -82,12 +85,15 @@ class Moderation(commands.Cog):
         if message.author.bot:
             return
 
-        lower_msg = message.content.lower()
-        if any(word in lower_msg for word in self.banned_words):
+        # Check message for banned words using regex
+        if self.banned_regex.search(message.content):
             try:
                 await message.delete()
             except discord.Forbidden:
-                pass
+                await self.log_action(
+                    message.guild,
+                    f"⚠️ Could not delete message from {message.author} (missing permissions)."
+                )
 
             try:
                 await message.author.send(
@@ -174,7 +180,3 @@ class Moderation(commands.Cog):
 # === Cog Setup ===
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
-
-
-
-
