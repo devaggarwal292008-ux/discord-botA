@@ -28,17 +28,7 @@ class Welcome(commands.Cog):
             except Exception:
                 return (len(text) * 10, 20)
 
-    def _draw_gradient_text(
-        self,
-        base_img: Image.Image,
-        pos: tuple[int, int],
-        text: str,
-        font: ImageFont.ImageFont,
-        left_color: tuple,
-        right_color: tuple,
-        shadow: int = 2,
-        boldness: int = 2  # 🔹 new: makes text look thicker
-    ):
+    def _draw_gradient_text(self, base_img: Image.Image, pos: tuple[int, int], text: str, font: ImageFont.ImageFont, left_color: tuple, right_color: tuple, shadow: int = 2):
         draw_base = ImageDraw.Draw(base_img)
         w, h = self._measure_text(draw_base, text, font)
         if w <= 0 or h <= 0:
@@ -46,30 +36,23 @@ class Welcome(commands.Cog):
 
         x, y = pos
 
-        # shadow
         if shadow:
             draw_base.text((x + shadow, y + shadow), text, font=font, fill="black")
 
-        # gradient mask
-        mask = Image.new("L", (w + 8, h + 8), 0)  # expand mask more
+        mask = Image.new("L", (w, h), 0)
         draw_mask = ImageDraw.Draw(mask)
+        draw_mask.text((0, 0), text, font=font, fill=255)
 
-        # 🔹 Bold effect: draw multiple offsets
-        for dx in range(-boldness, boldness + 1):
-            for dy in range(-boldness, boldness + 1):
-                draw_mask.text((4 + dx, 4 + dy), text, font=font, fill=255)
-
-        # gradient
-        grad = Image.new("RGBA", (w + 8, h + 8), (0, 0, 0, 0))
+        grad = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         grad_draw = ImageDraw.Draw(grad)
-        for i in range(w + 8):
-            t = i / max(1, (w + 7))
+        for i in range(w):
+            t = i / (w - 1) if w > 1 else 0
             r = int(left_color[0] * (1 - t) + right_color[0] * t)
             g = int(left_color[1] * (1 - t) + right_color[1] * t)
             b = int(left_color[2] * (1 - t) + right_color[2] * t)
-            grad_draw.line([(i, 0), (i, h + 8)], fill=(r, g, b, 255))
+            grad_draw.line([(i, 0), (i, h)], fill=(r, g, b, 255))
 
-        base_img.paste(grad, (x - 4, y - 4), mask)
+        base_img.paste(grad, (x, y), mask)
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
@@ -90,7 +73,6 @@ class Welcome(commands.Cog):
             background = Image.open(banner_path).convert("RGBA")
             W, H = background.size
 
-            # avatar
             avatar_asset = member.display_avatar.replace(size=256)
             avatar_bytes = await avatar_asset.read()
             avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
@@ -111,7 +93,6 @@ class Welcome(commands.Cog):
             avatar_y = (H - bordered.size[1]) // 2
             background.paste(bordered, (avatar_x, avatar_y), bordered)
 
-            # fonts
             try:
                 font_big = ImageFont.truetype(font_path, int(H * 0.14))
                 font_small = ImageFont.truetype(font_path, int(H * 0.07))
@@ -127,18 +108,16 @@ class Welcome(commands.Cog):
             text_x = avatar_x + bordered.size[0] + int(W * 0.05)
             main_w, main_h = self._measure_text(draw, main_text, font_big)
             avatar_center_y = avatar_y + bordered.size[1] // 2
-
             text_y = avatar_center_y - main_h // 2 - int(H * 0.04)
-            subtext_y = text_y + main_h + int(H * 0.05)  # 🔹 increased gap
+            subtext_y = text_y + main_h + int(H * 0.03)
 
-            # 🔹 Gradient + bold
             self._draw_gradient_text(
                 background, (text_x, text_y), main_text, font_big,
-                left_color=(0, 220, 220), right_color=(255, 255, 255), shadow=3, boldness=2
+                left_color=(0, 220, 220), right_color=(255, 255, 255), shadow=3
             )
             self._draw_gradient_text(
                 background, (text_x, subtext_y), subtext, font_small,
-                left_color=(0, 220, 220), right_color=(255, 255, 255), shadow=2, boldness=2
+                left_color=(0, 220, 220), right_color=(255, 255, 255), shadow=2
             )
 
             buf = io.BytesIO()
@@ -146,6 +125,7 @@ class Welcome(commands.Cog):
             buf.seek(0)
             file = discord.File(fp=buf, filename="welcome.png")
 
+            # ✅ Only one message (banner + text in one)
             await channel.send(content=f"🎉 Welcome {member.mention} to **{guild.name}**!", file=file)
 
         except Exception as exc:
