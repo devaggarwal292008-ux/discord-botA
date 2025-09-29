@@ -93,6 +93,7 @@ class Levels(commands.Cog):
     # Slash rank command
     @app_commands.command(name="level", description="Check your current level, XP, rank, and roles")
     async def level_slash(self, interaction: discord.Interaction, member: discord.Member | None = None):
+        await interaction.response.defer(thinking=True)  # ✅ prevent timeout
         member = member or interaction.user
         await self.send_level_embed(interaction, member, slash=True)
 
@@ -106,7 +107,7 @@ class Levels(commands.Cog):
         earned_roles = self.user_roles.get(member.id, [])
         roles_display = ", ".join(earned_roles) if earned_roles else "None"
 
-        # --- NEW: Rank calculation ---
+        # --- Rank calculation ---
         sorted_users = sorted(self.user_xp.items(), key=lambda x: x[1], reverse=True)
         rank = next((i for i, (uid, _) in enumerate(sorted_users, start=1) if uid == member.id), None)
 
@@ -122,7 +123,7 @@ class Levels(commands.Cog):
         embed.set_thumbnail(url=member.display_avatar.url)
 
         if slash:
-            await ctx.response.send_message(embed=embed)
+            await ctx.followup.send(embed=embed)  # ✅ send after deferring
         else:
             await ctx.send(embed=embed)
 
@@ -145,8 +146,10 @@ class Levels(commands.Cog):
 
     @app_commands.command(name="leaderboard", description="View the top players")
     async def leaderboard_slash(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)  # ✅ prevent timeout
+
         if not self.user_xp:
-            return await interaction.response.send_message("⚠️ No XP data yet!")
+            return await interaction.followup.send("⚠️ No XP data yet!")
 
         sorted_users = sorted(self.user_xp.items(), key=lambda x: x[1], reverse=True)[:10]
         embed = discord.Embed(title="🏆 Leaderboard - Top Voidwalkers", color=discord.Color.gold())
@@ -157,7 +160,7 @@ class Levels(commands.Cog):
                 embed.add_field(name=f"{i}. {member.display_name}",
                                 value=f"Level {lvl} | {xp} XP", inline=False)
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     # Daily reward
     @commands.command()
@@ -166,6 +169,7 @@ class Levels(commands.Cog):
 
     @app_commands.command(name="daily", description="Claim your daily XP reward")
     async def daily_slash(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)  # ✅ prevent timeout
         await self.handle_daily(interaction, slash=True)
 
     async def handle_daily(self, ctx, slash=False):
@@ -184,20 +188,9 @@ class Levels(commands.Cog):
             msg = f"🎁 {ctx.author.mention if not slash else ctx.user.mention}, you claimed your daily reward of **50 XP**!"
 
         if slash:
-            await ctx.response.send_message(msg)
+            await ctx.followup.send(msg)  # ✅ send after deferring
         else:
             await ctx.send(msg)
 
 async def setup(bot):
-    cog = Levels(bot)
-    await bot.add_cog(cog)
-    # ✅ Register slash commands explicitly
-    bot.tree.add_command(cog.level_slash)
-    bot.tree.add_command(cog.leaderboard_slash)
-    bot.tree.add_command(cog.daily_slash)
-
-
-async def setup(bot):
     await bot.add_cog(Levels(bot))
-
-
