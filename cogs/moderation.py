@@ -114,19 +114,24 @@ class Moderation(commands.Cog):
     @app_commands.command(name="warnings", description="Check how many warnings a user has")
     async def warnings_slash(self, interaction: discord.Interaction, member: discord.Member = None):
         member = member or interaction.user
-        await self.show_warnings(member, interaction.response.send_message)
+        await interaction.response.defer(thinking=True)
+        await self.show_warnings(member, interaction.followup.send)
 
     @app_commands.command(name="clearwarnings", description="Clear all warnings for a user")
     async def clearwarnings_slash(self, interaction: discord.Interaction, member: discord.Member):
         if not await self.is_moderator(interaction):
             return await interaction.response.send_message("❌ You don’t have permission.", ephemeral=True)
-        await self.clear_warnings(member, interaction.response.send_message)
+        
+        await interaction.response.defer(thinking=True)
+        await self.clear_warnings(member, interaction.followup.send)
 
     @app_commands.command(name="warn", description="Warn a user")
     async def warn_slash(self, interaction: discord.Interaction, member: discord.Member, *, reason: str = "No reason provided"):
         if not await self.is_moderator(interaction):
             return await interaction.response.send_message("❌ You don’t have permission.", ephemeral=True)
-        await self.add_warning(member, reason, interaction.response.send_message)
+        
+        await interaction.response.defer(thinking=True)
+        await self.add_warning(member, reason, interaction.followup.send)
 
     @app_commands.command(name="mute", description="Mute a user for a certain duration")
     async def mute_slash(self, interaction: discord.Interaction, member: discord.Member, duration: str, *, reason: str = "No reason provided"):
@@ -180,3 +185,4 @@ class Moderation(commands.Cog):
 # === Cog Setup ===
 async def setup(bot: commands.Bot):
     await bot.add_cog(Moderation(bot))
+
