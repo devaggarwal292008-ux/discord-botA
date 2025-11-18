@@ -14,9 +14,9 @@ class Moderation(commands.Cog):
         self.warnings: dict[int, int] = {}
         self.banned_words = [
             # English
-            "fuck", "shit", "bitch", "asshole", "bastard", "cunt", "dick", "pussy", "slut", "whore",
+            "fuck", "sex", "sexual", "nude", "porn", "horny", "rape", "cum", "masturbate", "shit", "bitch", "asshole", "bastard", "cunt", "dick", "pussy", "slut", "whore",
             # Hindi
-            "randi", "madarchod", "bhenchod", "lund", "chutiya", "gaand", "harami", "nalayak",
+            "randi", "madarchod", "bhenchod", "lund", "chutiya", "gaand", "harami",
             "kamina", "kutta", "kutti", "gandu", "tatti"
         ]
         # compile regex for performance, word boundaries + case insensitive
